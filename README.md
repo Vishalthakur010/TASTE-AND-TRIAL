@@ -124,11 +124,7 @@ For detailed API documentation, please refer to:
 
 Contributions are welcome! Please read our [Contribution Guide](./docs/10_Contribution_Guide.md) for details on how to contribute to this project.
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Contact
 
-Your Name - your.email@example.com  
-Project Link: [https://github.com/yourusername/restaurant-booking-platform](https://github.com/yourusername/restaurant-booking-platform)
+Your Name - vishalthakur970820@gmail.com
+Project Link: [https://github.com/Vishalthakur010/TASTE-AND-TRIAL](https://github.com/Vishalthakur010/TASTE-AND-TRIAL)
