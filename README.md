@@ -103,15 +103,19 @@ Explore our comprehensive documentation to understand the system architecture an
 
 ```
 backend/
-├── config/         # Configuration files
-├── controllers/    # Route controllers
-├── docs/           # Project documentation
-├── middleware/     # Custom middleware
-├── models/         # Database models
-├── routes/         # API route definitions
-├── services/       # Business logic
-├── tests/          # Test files
-└── utils/          # Utility functions
+├── src/
+│    ├── controllers/         # Request handlers
+│    ├── routes/              # Route definitions
+│    ├── models/              # Database models
+│    ├── services/            # Business logic
+│    ├── middlewares/         # Custom middlewares
+│    ├── utils/               # Utility functions
+│    ├── config/              # Configuration
+│    ├── app.js               # Express app setup
+│    └── server.js            # Server entry point
+├── .env                     # Environment variables
+├── .gitignore
+└── package.json
 ```
 
 ## API Reference
