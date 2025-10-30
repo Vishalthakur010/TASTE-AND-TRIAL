@@ -314,10 +314,3 @@ Implementation notes:
 * Use contract tests to ensure frontend-backend compatibility.
 
 ---
-
-## 9. Next Steps
-
-* Convert this design into an OpenAPI spec (`openapi.yaml`) and place in `docs/04_API_Design.md` with examples.
-* Create server route skeletons and sample responses for frontend mocking.
-
----
