@@ -1,14 +1,14 @@
 # Restaurant Booking Platform — API Design Documentation (Phase 4)
 
-> RESTful API design for both mobile and web (React) clients. Uses cursor-based pagination (infinite scroll), filtering, and role-based access (User / Admin).
+> RESTful API design for both mobile and web (React) clients. Uses cursor-based pagination (infinite scroll), filtering, and role-based access (`user`, `restaurantOwner`, `admin`).
 
 ---
 
 ## 1. Base URL & Versioning
 
-* **Base URL:** `https://api.yourdomain.com` (replace with actual domain)
-* **API Prefix:** `/api/v1`
-* Versioning is included in the URL to allow future breaking changes: `/api/v2` etc.
+- **Base URL:** `https://api.yourdomain.com` (replace with actual domain)
+- **API Prefix:** `/api/v1`
+- **Versioning:** Included in the URL to support future versions (e.g., `/api/v2`).
 
 ---
 
@@ -16,301 +16,264 @@
 
 ### 2.1 Tokens
 
-* **Access Token (JWT):** short-lived (e.g., 15m). Sent in the `Authorization` header:
-
-  * `Authorization: Bearer <access_token>`
-* **Refresh Token:** long-lived (e.g., 7d) stored securely (httpOnly cookie on web or secure storage on mobile). Exchange refresh token at `/auth/refresh`.
+- **Access Token (JWT):** Short-lived (e.g., 15m). Sent in the `Authorization` header:
+  ```
+  Authorization: Bearer <access_token>
+  ```
+- **Refresh Token:** Long-lived (e.g., 7d), stored securely (httpOnly cookie on web or secure storage on mobile).  
+  Exchange at `/auth/refresh`.
 
 ### 2.2 Roles
 
-* `user` — normal end-user (browse, book, review)
-* `admin` — platform/restaurant owner (manage restaurants, menus, bookings)
+- `user` — normal platform user (browse, book, review)
+- `restaurantOwner` — manages their own restaurant listings, menus, and bookings
+- `admin` — super admin who oversees all restaurants, users, and platform operations
 
-Authorization middleware will enforce role checks (e.g., `requireRole('admin')`).
+Authorization middleware will enforce role checks (e.g., `requireRole('restaurantOwner')` or `requireRole('admin')`).
 
 ---
 
 ## 3. Common Response Format
 
-All successful responses follow a consistent structure:
-
+**Success Response:**
 ```json
 {
   "success": true,
-  "data": { ... },
-  "meta": { ... } // optional (pagination, totals, nextCursor)
+  "data": { },
+  "meta": { } // optional (pagination, totals, nextCursor)
 }
 ```
 
-Error responses:
-
+**Error Response:**
 ```json
 HTTP/1.1 400 Bad Request
 {
   "success": false,
   "error": {
     "code": "INVALID_INPUT",
-    "message": "Description of the error",
-    "details": { /* optional */ }
+    "message": "Description of the error"
   }
 }
 ```
 
-Common error HTTP codes and example `code` strings:
+**Common Error Codes:**
 
-* `400` — `INVALID_INPUT`
-* `401` — `UNAUTHORIZED`
-* `403` — `FORBIDDEN`
-* `404` — `NOT_FOUND`
-* `409` — `CONFLICT` (e.g., double booking)
-* `429` — `RATE_LIMITED`
-* `500` — `INTERNAL_ERROR`
+| HTTP Code | Code String       | Description                      |
+|------------|------------------|----------------------------------|
+| 400        | INVALID_INPUT    | Bad or missing data              |
+| 401        | UNAUTHORIZED     | Invalid or missing token         |
+| 403        | FORBIDDEN        | Insufficient role permissions    |
+| 404        | NOT_FOUND        | Resource not found               |
+| 409        | CONFLICT         | Duplicate entry / double booking |
+| 429        | RATE_LIMITED     | Too many requests                |
+| 500        | INTERNAL_ERROR   | Server error                     |
 
 ---
 
 ## 4. Pagination, Filtering & Sorting
 
-### 4.1 Cursor-based Pagination (infinite scroll)
+### 4.1 Cursor-based Pagination
 
-* Query params: `limit`, `cursor`
-* Response includes `nextCursor` (string or null). If `nextCursor` is absent or `null`, no more data.
+- Params: `limit`, `cursor`
+- Response includes `nextCursor` (string or null)
 
 Example:
+```
+GET /api/v1/restaurants?limit=10&sort=distance
+```
 
-* First call: `GET /api/v1/restaurants?limit=10&sort=distance`
-* Response: `{ data: [...], meta: { nextCursor: "r110" } }`
-* Next call: `GET /api/v1/restaurants?limit=10&cursor=r110&sort=distance`
-
-Implementation note: Use a stable sort (e.g., by distance then _id) to ensure no missing/duplicate items when paginating.
+Response:
+```json
+{
+  "data": [...],
+  "meta": { "nextCursor": "r110" }
+}
+```
 
 ### 4.2 Filtering Parameters
 
-Common filters (applied as query params):
-
-* `cuisine` (string) — e.g., `cuisine=italian` or `cuisines=italian,mexican`
-* `minRating` (number) — e.g., `minRating=4`
-* `priceLevel` (number or comma-separated)
-* `openNow` (boolean) — checks current time against `openingHours`
-* `lat`, `lng`, `radius` (meters) — for geospatial queries
-* `q` (string) — text search across name/description/cuisines
-
-Example combined request:
-
-```
-GET /api/v1/restaurants?limit=20&lat=26.9124&lng=75.7873&radius=5000&cuisine=italian&minRating=4&sort=distance
-```
+| Parameter | Description | Example |
+|------------|--------------|----------|
+| `cuisine` | Filter by cuisine type | `cuisine=italian` |
+| `minRating` | Minimum rating | `minRating=4` |
+| `priceLevel` | Price level (1-4) | `priceLevel=2` |
+| `openNow` | Currently open | `openNow=true` |
+| `lat`, `lng`, `radius` | For geospatial search | `lat=26.91&lng=75.78&radius=5000` |
+| `q` | Text search | `q=pizza` |
 
 ### 4.3 Sorting
 
-* `sort` param options:
-
-  * `distance` (requires lat,lng)
-  * `rating` (desc)
-  * `popular` (by booking/review count)
-  * `price` (asc/desc)
+Options:  
+- `distance` (requires `lat`, `lng`)
+- `rating`
+- `popular`
+- `price_asc`, `price_desc`
 
 ---
 
 ## 5. Endpoints
 
-Below are primary endpoints with purpose, access, query parameters, and sample request/response snippets.
-
 ### 5.1 Auth
 
-#### POST /api/v1/auth/register
+#### `POST /api/v1/auth/register`
+- Register new user or restaurant owner
+- **Body:** `{ name, email, password, phone, role }`
+- **Response:** `201` — user object + tokens
 
-* **Desc:** Register new user
-* **Body:** `{ name, email, password, phone }`
-* **Response:** `201` — user summary + tokens
+#### `POST /api/v1/auth/login`
+- Login existing user
+- **Body:** `{ email, password }`
+- **Response:** `{ accessToken, refreshToken, user }`
 
-#### POST /api/v1/auth/login
+#### `POST /api/v1/auth/refresh`
+- Get new access token using refresh token
 
-* **Desc:** Login and receive access + refresh tokens
-* **Body:** `{ email, password }`
-* **Response:** `200` — `{ accessToken, refreshToken, user }`
-
-#### POST /api/v1/auth/refresh
-
-* **Desc:** Exchange refresh token for new access token
-* **Access:** refresh token via cookie or body
-
-#### POST /api/v1/auth/logout
-
-* **Desc:** Revoke refresh token (server-side or remove cookie)
-* **Access:** Authenticated
+#### `POST /api/v1/auth/logout`
+- Logout and invalidate tokens
 
 ---
 
 ### 5.2 Restaurants
 
-#### GET /api/v1/restaurants
+#### `GET /api/v1/restaurants`
+- **Desc:** List / Search restaurants
+- **Access:** Public
+- **Query:** `limit`, `cursor`, `lat`, `lng`, `radius`, `cuisine`, `sort`, etc.
 
-* **Desc:** List / Search restaurants (cursor-based)
-* **Query Params:** `limit`, `cursor`, `lat`, `lng`, `radius`, `cuisine`, `minRating`, `priceLevel`, `openNow`, `q`, `sort`
-* **Access:** Public
+#### `GET /api/v1/restaurants/:id`
+- **Desc:** Get restaurant details, menu, reviews
+- **Access:** Public
 
-**Sample Request:**
+#### `POST /api/v1/restaurants`
+- **Desc:** Create new restaurant
+- **Access:** `restaurantOwner` or `admin`
 
-```
-GET /api/v1/restaurants?limit=15&lat=26.9124&lng=75.7873&radius=5000&cuisine=italian&minRating=4&sort=distance
-```
+#### `PUT /api/v1/restaurants/:id`
+- **Desc:** Update restaurant details
+- **Access:** Only the restaurant owner or admin
 
-**Sample Response:**
-
-```json
-{
-  "success": true,
-  "data": [
-    { "_id": "r101", "name": "The Spice Route", "distance_m": 1200, "ratingAvg": 4.5 }
-  ],
-  "meta": { "nextCursor": "r115", "count": 15 }
-}
-```
-
-Implementation notes:
-
-* Use `$geoNear` aggregation when `lat`/`lng` provided to compute `distance`.
-* If sorting by `distance`, `cursor` should encode both distance and last `_id` to avoid ordering edge-cases.
-
-#### GET /api/v1/restaurants/:id
-
-* **Desc:** Get restaurant details (menus, openingHours, rating summary)
-* **Access:** Public
-
-#### POST /api/v1/restaurants
-
-* **Desc:** Create restaurant (Admin)
-* **Access:** `admin`
-* **Body:** full restaurant object
-
-#### PUT /api/v1/restaurants/:id
-
-* **Desc:** Update restaurant (Admin)
-* **Access:** `admin`
-
-#### DELETE /api/v1/restaurants/:id
-
-* **Desc:** Delete restaurant (Admin)
-* **Access:** `admin`
+#### `DELETE /api/v1/restaurants/:id`
+- **Desc:** Delete restaurant
+- **Access:** `admin`
 
 ---
 
 ### 5.3 Menu
 
-#### GET /api/v1/restaurants/:id/menu
+#### `GET /api/v1/restaurants/:id/menu`
+- **Desc:** Get restaurant’s menu
+- **Access:** Public
 
-* **Desc:** Get restaurant menu (public)
+#### `POST /api/v1/restaurants/:id/menu`
+- **Desc:** Add menu item
+- **Access:** `restaurantOwner` or `admin`
 
-#### POST /api/v1/restaurants/:id/menu
+#### `PUT /api/v1/restaurants/:id/menu/:menuId`
+- **Desc:** Update menu item
+- **Access:** `restaurantOwner` or `admin`
 
-* **Desc:** Add menu item (admin)
-* **Access:** `admin`
-* **Body:** `{ name, description, price, category, available }`
-
-#### PUT /api/v1/restaurants/:id/menu/:menuId
-
-* **Desc:** Update menu item (admin)
-* **Access:** `admin`
-
-#### DELETE /api/v1/restaurants/:id/menu/:menuId
-
-* **Desc:** Delete menu item (admin)
-* **Access:** `admin`
+#### `DELETE /api/v1/restaurants/:id/menu/:menuId`
+- **Desc:** Delete menu item
+- **Access:** `restaurantOwner` or `admin`
 
 ---
 
 ### 5.4 Reviews
 
-#### POST /api/v1/restaurants/:id/reviews
+#### `POST /api/v1/restaurants/:id/reviews`
+- **Desc:** Create new review
+- **Access:** `user`
+- **Body:** `{ rating, text, images? }`
+- **Behavior:** Updates restaurant’s `ratingAvg` and `ratingCount`.
 
-* **Desc:** Create review
-* **Access:** `user` (authenticated)
-* **Body:** `{ rating: 1-5, text, images? }`
-* **Behavior:** Update restaurant `ratingAvg` and `ratingCount` transactionally or via two-step update ensuring consistency.
+#### `GET /api/v1/restaurants/:id/reviews`
+- **Desc:** Fetch restaurant reviews
+- **Query:** `limit`, `cursor`, `sort=recent|helpful`
 
-**Response:** `201` created
-
-#### GET /api/v1/restaurants/:id/reviews
-
-* **Desc:** List reviews (cursor/page)
-* **Query:** `limit`, `cursor`, `sort=recent|helpful`
-
-#### DELETE /api/v1/restaurants/:id/reviews/:reviewId
-
-* **Desc:** Delete review (owner or admin)
+#### `DELETE /api/v1/restaurants/:id/reviews/:reviewId`
+- **Access:** Review author or `admin`
 
 ---
 
 ### 5.5 Bookings
 
-#### POST /api/v1/bookings
+#### `POST /api/v1/bookings`
+- **Desc:** Create booking
+- **Access:** `user`
+- **Body:** `{ restaurantId, bookingTime, partySize, specialRequests? }`
+- **Response:** `201` — booking details or `409` if slot not available
 
-* **Desc:** Create booking
-* **Access:** `user`
-* **Body:** `{ restaurantId, bookingTime (ISO), partySize, specialRequests? }`
-* **Behavior:** Check availability, prevent double-bookings using transactions / optimistic locking.
+#### `GET /api/v1/bookings`
+- **Desc:** Fetch bookings
+- **Access:**  
+  - `user` → their bookings  
+  - `restaurantOwner` → bookings for their restaurants  
+  - `admin` → all bookings
+- **Query:** `limit`, `cursor`, `restaurantId`
 
-**Success:** `201` with booking object
-**Conflict:** `409` `{"code":"CONFLICT","message":"Time slot not available"}`
+#### `PUT /api/v1/bookings/:id/cancel`
+- **Desc:** Cancel booking
+- **Access:** `user`, `restaurantOwner`, or `admin`
 
-#### GET /api/v1/bookings
-
-* **Desc:** List user bookings (cursor-based)
-* **Access:** `user` (returns user's bookings) or `admin` with `restaurantId` filter
-* **Query Params:** `limit`, `cursor`, `restaurantId` (admin)
-
-#### PUT /api/v1/bookings/:id/cancel
-
-* **Desc:** Cancel booking
-* **Access:** `user` (owner) or `admin`
-
-#### PUT /api/v1/bookings/:id/confirm
-
-* **Desc:** Admin confirms booking (if required)
-* **Access:** `admin`
+#### `PUT /api/v1/bookings/:id/confirm`
+- **Desc:** Confirm booking
+- **Access:** `restaurantOwner` or `admin`
 
 ---
 
-### 5.6 Admin / Management
+### 5.6 Admin Management
 
-* Endpoints protected by `admin` role for managing restaurants, menus, viewing all bookings, and user management.
-* Recommended prefix: `/api/v1/admin/*` or reuse resource endpoints with role checks.
+**Prefix:** `/api/v1/admin/*`
+
+Admin-level routes include:
+- Manage users
+- View all restaurants
+- Suspend restaurantOwner accounts
+- Access global analytics (optional)
 
 ---
 
 ## 6. Example Workflows
 
-### 6.1 Browse & Book (Mobile or Web)
+### 6.1 Browse & Book (User Flow)
 
-1. Frontend requests nearby restaurants with:
+1. `GET /api/v1/restaurants?lat=...&lng=...&limit=10`
+2. Select a restaurant → `GET /api/v1/restaurants/:id`
+3. `POST /api/v1/bookings` with desired time and party size
+4. Backend validates and confirms booking
+5. Email/SMS confirmation sent
 
-   * `GET /api/v1/restaurants?lat=...&lng=...&limit=10`
-2. Backend returns `data` and `nextCursor`.
-3. Frontend displays results; on scroll, it requests next batch with `cursor`.
-4. User taps a restaurant → `GET /api/v1/restaurants/:id` to fetch details + menu.
-5. User books: `POST /api/v1/bookings` (authenticated). Backend checks availability and returns booking.
-6. Backend sends confirmation (email/SMS) asynchronously via background job.
+### 6.2 Restaurant Owner Adds Restaurant
 
-### 6.2 Admin Adds Restaurant
-
-1. Admin logs in and calls `POST /api/v1/restaurants` with restaurant data.
-2. Backend validates and saves; index updates allow immediate searchability.
-3. Admin adds menu items via `POST /api/v1/restaurants/:id/menu`.
+1. Restaurant owner logs in → obtains token  
+2. `POST /api/v1/restaurants` with restaurant details  
+3. Adds menu items via `POST /api/v1/restaurants/:id/menu`  
+4. Can view bookings with `GET /api/v1/bookings?restaurantId=...`
 
 ---
 
-## 7. Rate Limiting & Caching Recommendations
+## 7. Rate Limiting & Caching
 
-* **Rate limiting:** Protect endpoints (e.g., auth, search) using Redis token-bucket or leaky-bucket.
-* **Caching:** Cache hotspot search results in Redis with short TTL (e.g., popular city tiles) to reduce DB load.
-* **Idempotency:** For booking endpoints consider idempotency tokens to avoid duplicate bookings on retries.
+- **Rate Limiting:** Redis-based token-bucket to prevent abuse on `/auth` and `/search`
+- **Caching:** Cache hot restaurant search results for 60–120s using Redis
+- **Idempotency:** For booking requests, include an idempotency key to prevent duplicate bookings
 
 ---
 
 ## 8. API Documentation & Testing
 
-* Provide an OpenAPI (Swagger) spec for automated docs and client generation.
-* Include example curl requests for every endpoint.
-* Use contract tests to ensure frontend-backend compatibility.
+- **OpenAPI (Swagger)** documentation for all endpoints
+- Example `curl` and Postman collections for testing
+- Automated contract tests between frontend and backend
+
+---
+
+**✅ Roles Summary:**
+
+| Role | Permissions Summary |
+|------|----------------------|
+| `user` | Can search, book, and review restaurants |
+| `restaurantOwner` | Can add/edit restaurants, menus, and manage bookings for owned restaurants |
+| `admin` | Full platform access (manage users, restaurants, bookings) |
 
 ---
