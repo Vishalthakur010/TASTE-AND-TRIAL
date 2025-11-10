@@ -1,5 +1,6 @@
 // src/models/user.model.js
-const mongoose = require('mongoose');
+// const mongoose = require('mongoose');
+import mongoose from 'mongoose'
 
 /**
  * User Schema (OTP-based authentication)
@@ -14,13 +15,12 @@ const mongoose = require('mongoose');
 const UserSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, 'Please add a name'],
     trim: true,
     maxlength: [50, 'Name cannot be more than 50 characters']
   },
   email: {
     type: String,
-    required: [true, 'Please add an email'],
+    // required: [true, 'Please add an email'],
     unique: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
@@ -29,8 +29,8 @@ const UserSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Please add a phone number'],
     unique: true,
+    sparse: true,  // This allows multiple nulls
     match: [/^\d{10}$/, 'Please add a valid 10-digit phone number']
   },
   role: {
@@ -67,4 +67,5 @@ UserSchema.statics.clearExpiredOtps = async function () {
   );
 };
 
-module.exports = mongoose.model('User', UserSchema);
+// module.exports = mongoose.model('User', UserSchema);
+export default mongoose.model('User', UserSchema)

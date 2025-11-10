@@ -1,5 +1,6 @@
-import User from '../models/user.model'
-import { generateOTP } from '../utils/otp_generate'
+import User from '../models/user.model.js'
+import { generateOTP } from '../utils/otp_generate.js'
+import {mailsender} from '../utils/mailSender.js'
 
 export const requestOtp = async (req, res) => {
     try {
@@ -32,11 +33,15 @@ export const requestOtp = async (req, res) => {
         let user = null
         if(email){
             user = await User.findOne({email})
-            if(!user) new User({email})
+            if(!user){
+                await new User({email}).save()
+            }
         }
         else if(phone){
             user = await User.findOne({phone})
-            if(!phone) new User({phone})
+            if(!user){
+                await new User({phone}).save()
+            } 
         }
 
         // generate otp
@@ -45,11 +50,26 @@ export const requestOtp = async (req, res) => {
         // save otp and expiry
         user.otp = otp
         user.otpExpiresAt = otpExpiresAt
-        user.save()
+        await user.save()
+
+        // send otp if email is provided
+        if(email){
+            const emailsent = await mailsender(email, otp)
+            if(!emailsent){
+                throw new Error("Failed to send OTP on email")
+            }
+        }
+
+        // If phone is provided, you would integrate with an SMS service here
+        else if (phone) {
+            // TODO: Implement SMS service integration
+            console.log(`SMS OTP for ${phone}: ${otp}`); 
+        }
 
         res.status(200).json({
             success: true,
-            message:`Otp sent successfully to ${email || phone}`
+            message:`Otp sent successfully to ${email || phone}`,
+            user
         })
     }
     catch (error) {

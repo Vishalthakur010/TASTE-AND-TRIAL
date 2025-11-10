@@ -4,7 +4,8 @@
  * @returns {Object} { otp, otpExpiresAt }
  */
 
-exports.generateOTP = function (expiryMinutes = 5) {
+// export function generateOTP(expiryMinutes = 5) {
+    export const generateOTP = (expiryMinutes = 5) => {
 
     // Generate a random 6-digit OTP (e.g., 123456)
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
