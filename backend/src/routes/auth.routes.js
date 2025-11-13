@@ -4,8 +4,9 @@ const router = express.Router()
 
 
 // import auth controller
-import { requestOtp } from '../controllers/auth.controller.js';
+import { requestOtp, verifyOtp } from '../controllers/auth.controller.js';
 
-router.post('/requestOTP', requestOtp)
+router.post('/request-otp', requestOtp)
+router.post('/verify-otp', verifyOtp)
 
 export default router;
